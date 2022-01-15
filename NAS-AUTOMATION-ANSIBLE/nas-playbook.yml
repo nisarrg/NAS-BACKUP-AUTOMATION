@@ -1,0 +1,60 @@
+- name: Let's setup NAS server on remote server
+  remote_user: root
+  become: yes
+
+  hosts: all
+  #become: yes
+  #become_user: root
+
+  vars:
+  #- distro_name: "{{ ansible_facts['distribution'] }}"
+  - server_home_dir_internal: "{{ server_home_dir }}"
+  - server_dir_internal: "{{ server_dir }}"
+
+  handlers:
+  - name: Restart nfs-utils
+    shell: systemctl enable --now nfs-server; exportfs -a
+
+  tasks:
+
+  - name: debug variables
+    debug: 
+       msg: Server's Home directory --> {{ server_home_dir_internal }}, and backup directory is --> {{ server_dir_internal }}
+
+  - name: Creat mountable directory if it does not exist (file module)
+    file:
+       state: directory
+       path: "{{ server_home_dir_internal }}/Desktop/{{ server_dir_internal }}"
+       mode: 0777
+
+  - name: enable rpcbind nfslock nfs
+    service:
+       name: "{{ item }}"
+       enabled: yes
+    with_items:
+       - rpcbind
+       - nfslock
+       - nfs
+    ignore_errors: yes
+    
+   
+  - name: deleting exports file if already present to create new one 
+    file:
+       path: /etc/exports
+       state: absent
+
+
+  - name: Copy exports file (template module)     
+    template:
+       dest: "/etc/exports"
+       src: "./exports.j2"
+       owner: root
+       group: root
+       mode: 0644
+    notify:
+    - Restart nfs-utils
+
+
+#  - name: Disabling firewall permanantly (firewalld module)  
+#    shell: systemctl stop --now firewalld
+    
